@@ -11,7 +11,6 @@ import net.corda.core.schemas.PersistentState
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.serialization.OpaqueBytes
 import org.bouncycastle.asn1.x500.X500Name
-import java.time.Instant
 import java.util.*
 import javax.persistence.criteria.Predicate
 
@@ -24,7 +23,7 @@ sealed class QueryCriteria {
     abstract fun visit(parser: IQueryCriteriaParser): Collection<Predicate>
 
     @CordaSerializable
-    data class TimeCondition(val type: TimeInstantType, val predicate: ColumnPredicate<Instant>)
+    data class TimeCondition(val type: TimeInstantType, val predicate: ColumnPredicate)
 
     abstract class CommonQueryCriteria : QueryCriteria() {
         abstract val status: Vault.StateStatus
@@ -68,7 +67,7 @@ sealed class QueryCriteria {
     */
     data class FungibleAssetQueryCriteria @JvmOverloads constructor(val participants: List<AbstractParty>? = null,
                                                                     val owner: List<AbstractParty>? = null,
-                                                                    val quantity: ColumnPredicate<Long>? = null,
+                                                                    val quantity: ColumnPredicate? = null,
                                                                     val issuerPartyName: List<AbstractParty>? = null,
                                                                     val issuerRef: List<OpaqueBytes>? = null,
                                                                     override val status: Vault.StateStatus = Vault.StateStatus.UNCONSUMED) : CommonQueryCriteria() {
@@ -88,7 +87,7 @@ sealed class QueryCriteria {
      * Refer to [CommercialPaper.State] for a concrete example.
      */
     data class VaultCustomQueryCriteria<L : PersistentState> @JvmOverloads constructor
-                                    (val expression: CriteriaExpression<L, Boolean>,
+                                    (val expression: CriteriaExpression,
                                      override val status: Vault.StateStatus = Vault.StateStatus.UNCONSUMED) : CommonQueryCriteria() {
         override fun visit(parser: IQueryCriteriaParser): Collection<Predicate> {
             return parser.parseCriteria(this as CommonQueryCriteria).plus(parser.parseCriteria(this))

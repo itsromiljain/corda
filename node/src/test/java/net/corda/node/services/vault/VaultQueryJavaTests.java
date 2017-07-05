@@ -48,7 +48,7 @@ import static net.corda.contracts.asset.CashKt.getDUMMY_CASH_ISSUER_KEY;
 import static net.corda.core.contracts.ContractsDSL.USD;
 import static net.corda.core.node.services.vault.QueryCriteriaKt.and;
 import static net.corda.core.node.services.vault.QueryCriteriaKt.or;
-import static net.corda.core.node.services.vault.QueryCriteriaUtilsKt.getMAX_PAGE_SIZE;
+import static net.corda.core.node.services.vault.QueryCriteriaUtils.MAX_PAGE_SIZE;
 import static net.corda.node.utilities.DatabaseSupportKt.configureDatabase;
 import static net.corda.node.utilities.DatabaseSupportKt.transaction;
 import static net.corda.testing.CoreTestUtils.getMEGA_CORP;
@@ -191,7 +191,7 @@ public class VaultQueryJavaTests {
             QueryCriteria compositeCriteria1 = or(dealCriteriaAll, linearCriteriaAll);
             QueryCriteria compositeCriteria2 = and(vaultCriteria, compositeCriteria1);
 
-            PageSpecification pageSpec  = new PageSpecification(0, getMAX_PAGE_SIZE());
+            PageSpecification pageSpec  = new PageSpecification(0, MAX_PAGE_SIZE);
             Sort.SortColumn sortByUid = new Sort.SortColumn(new SortAttribute.Standard(Sort.LinearStateAttribute.UUID), Sort.Direction.DESC);
             Sort sorting = new Sort(ImmutableSet.of(sortByUid));
             Vault.Page<LinearState> results = vaultQuerySvc.queryBy(LinearState.class, compositeCriteria2, pageSpec, sorting);
@@ -268,8 +268,8 @@ public class VaultQueryJavaTests {
             VaultQueryCriteria criteria = new VaultQueryCriteria(Vault.StateStatus.UNCONSUMED, contractStateTypes);
             DataFeed<Vault.Page<ContractState>, Vault.Update> results = vaultQuerySvc.trackBy(ContractState.class, criteria);
 
-            Vault.Page<ContractState> snapshot = results.getCurrent();
-            Observable<Vault.Update> updates = results.getFuture();
+            Vault.Page<ContractState> snapshot = results.getSnapshot();
+            Observable<Vault.Update> updates = results.getUpdates();
 
             // DOCEND VaultJavaQueryExample4
             assertThat(snapshot.getStates()).hasSize(3);
@@ -300,7 +300,7 @@ public class VaultQueryJavaTests {
             QueryCriteria dealOrLinearIdCriteria = or(dealCriteria, linearCriteria);
             QueryCriteria compositeCriteria = and(dealOrLinearIdCriteria, vaultCriteria);
 
-            PageSpecification pageSpec  = new PageSpecification(0, getMAX_PAGE_SIZE());
+            PageSpecification pageSpec  = new PageSpecification(0, MAX_PAGE_SIZE);
             Sort.SortColumn sortByUid = new Sort.SortColumn(new SortAttribute.Standard(Sort.LinearStateAttribute.UUID), Sort.Direction.DESC);
             Sort sorting = new Sort(ImmutableSet.of(sortByUid));
             DataFeed<Vault.Page<ContractState>, Vault.Update> results = vaultQuerySvc.trackBy(ContractState.class, compositeCriteria, pageSpec, sorting);

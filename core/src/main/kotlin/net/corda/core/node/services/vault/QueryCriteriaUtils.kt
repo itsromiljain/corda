@@ -1,3 +1,5 @@
+@file:JvmName("QueryCriteriaUtils")
+
 package net.corda.core.node.services.vault
 
 import net.corda.core.schemas.PersistentState
@@ -45,47 +47,47 @@ enum class CollectionOperator {
 }
 
 @CordaSerializable
-sealed class CriteriaExpression<O, out T> {
-    data class BinaryLogical<O>(val left: CriteriaExpression<O, Boolean>, val right: CriteriaExpression<O, Boolean>, val operator: BinaryLogicalOperator) : CriteriaExpression<O, Boolean>()
-    data class Not<O>(val expression: CriteriaExpression<O, Boolean>) : CriteriaExpression<O, Boolean>()
-    data class ColumnPredicateExpression<O, C>(val column: Column<O, C>, val predicate: ColumnPredicate<C>) : CriteriaExpression<O, Boolean>()
+sealed class CriteriaExpression {
+    data class BinaryLogical(val left: CriteriaExpression, val right: CriteriaExpression, val operator: BinaryLogicalOperator) : CriteriaExpression()
+    data class Not(val expression: CriteriaExpression) : CriteriaExpression()
+    data class ColumnPredicateExpression(val column: Column, val predicate: ColumnPredicate) : CriteriaExpression()
 }
 
 @CordaSerializable
-sealed class Column<O, out C> {
-    data class Java<O, out C>(val field: Field) : Column<O, C>()
-    data class Kotlin<O, out C>(val property: KProperty1<O, C?>) : Column<O, C>()
+sealed class Column {
+    data class Java(val field: Field) : Column()
+    data class Kotlin<O, out C>(val property: KProperty1<O, C?>) : Column()
 }
 
 @CordaSerializable
-sealed class ColumnPredicate<C> {
-    data class EqualityComparison<C>(val operator: EqualityComparisonOperator, val rightLiteral: C) : ColumnPredicate<C>()
-    data class BinaryComparison<C : Comparable<C>>(val operator: BinaryComparisonOperator, val rightLiteral: C) : ColumnPredicate<C>()
-    data class Likeness(val operator: LikenessOperator, val rightLiteral: String) : ColumnPredicate<String>()
-    data class CollectionExpression<C>(val operator: CollectionOperator, val rightLiteral: Collection<C>) : ColumnPredicate<C>()
-    data class Between<C : Comparable<C>>(val rightFromLiteral: C, val rightToLiteral: C) : ColumnPredicate<C>()
-    data class NullExpression<C>(val operator: NullOperator) : ColumnPredicate<C>()
+sealed class ColumnPredicate {
+    data class EqualityComparison<out C>(val operator: EqualityComparisonOperator, val rightLiteral: C) : ColumnPredicate()
+    data class BinaryComparison<C : Comparable<C>>(val operator: BinaryComparisonOperator, val rightLiteral: C) : ColumnPredicate()
+    data class Likeness(val operator: LikenessOperator, val rightLiteral: String) : ColumnPredicate()
+    data class CollectionExpression<out C>(val operator: CollectionOperator, val rightLiteral: Collection<C>) : ColumnPredicate()
+    data class Between<C : Comparable<C>>(val rightFromLiteral: C, val rightToLiteral: C) : ColumnPredicate()
+    data class NullExpression(val operator: NullOperator) : ColumnPredicate()
 }
 
-fun <O, R> resolveEnclosingObjectFromExpression(expression: CriteriaExpression<O, R>): Class<O> {
+fun <O> resolveEnclosingObjectFromExpression(expression: CriteriaExpression): Class<O> {
     return when (expression) {
         is CriteriaExpression.BinaryLogical -> resolveEnclosingObjectFromExpression(expression.left)
         is CriteriaExpression.Not -> resolveEnclosingObjectFromExpression(expression.expression)
-        is CriteriaExpression.ColumnPredicateExpression<O, *> -> resolveEnclosingObjectFromColumn(expression.column)
+        is CriteriaExpression.ColumnPredicateExpression -> resolveEnclosingObjectFromColumn(expression.column)
     }
 }
 
-fun <O, C> resolveEnclosingObjectFromColumn(column: Column<O, C>): Class<O> {
+fun <O> resolveEnclosingObjectFromColumn(column: Column): Class<O> {
     return when (column) {
         is Column.Java -> column.field.declaringClass as Class<O>
-        is Column.Kotlin -> column.property.javaField!!.declaringClass as Class<O>
+        is Column.Kotlin<*, *> -> column.property.javaField!!.declaringClass as Class<O>
     }
 }
 
-fun <O, C> getColumnName(column: Column<O, C>): String {
+fun getColumnName(column: Column): String {
     return when (column) {
         is Column.Java -> column.field.name
-        is Column.Kotlin -> column.property.name
+        is Column.Kotlin<*, *> -> column.property.name
     }
 }
 
@@ -102,14 +104,14 @@ fun <O, C> getColumnName(column: Column<O, C>): String {
  *  paging and sorting capability:
  *  https://docs.spring.io/spring-data/commons/docs/current/api/org/springframework/data/repository/PagingAndSortingRepository.html
  */
-val DEFAULT_PAGE_NUM = 0
-val DEFAULT_PAGE_SIZE = 200
+const val DEFAULT_PAGE_NUM = 0
+const val DEFAULT_PAGE_SIZE = 200
 
 /**
  * Note: this maximum size will be configurable in future (to allow for large JVM heap sized node configurations)
  *       Use [PageSpecification] to correctly handle a number of bounded pages of [MAX_PAGE_SIZE].
  */
-val MAX_PAGE_SIZE = 512
+const val MAX_PAGE_SIZE = 512
 
 /**
  * PageSpecification allows specification of a page number (starting from 0 as default) and page size (defaulting to
@@ -184,8 +186,8 @@ object Builder {
 
     fun <R : Comparable<R>> compare(operator: BinaryComparisonOperator, value: R) = ColumnPredicate.BinaryComparison(operator, value)
 
-    fun <O, R> KProperty1<O, R?>.predicate(predicate: ColumnPredicate<R>) = CriteriaExpression.ColumnPredicateExpression(Column.Kotlin(this), predicate)
-    fun <R> Field.predicate(predicate: ColumnPredicate<R>) = CriteriaExpression.ColumnPredicateExpression(Column.Java<Any, R>(this), predicate)
+    fun <O, R> KProperty1<O, R?>.predicate(predicate: ColumnPredicate) = CriteriaExpression.ColumnPredicateExpression(Column.Kotlin(this), predicate)
+    fun <R> Field.predicate(predicate: ColumnPredicate) = CriteriaExpression.ColumnPredicateExpression(Column.Java(this), predicate)
 
     fun <O, R : Comparable<R>> KProperty1<O, R?>.comparePredicate(operator: BinaryComparisonOperator, value: R) = predicate(compare(operator, value))
     fun <R : Comparable<R>> Field.comparePredicate(operator: BinaryComparisonOperator, value: R) = predicate(compare(operator, value))
@@ -226,9 +228,9 @@ object Builder {
     fun Field.notLike(string: String) = predicate(ColumnPredicate.Likeness(LikenessOperator.NOT_LIKE, string))
 
     fun <O, R> KProperty1<O, R?>.isNull() = predicate(ColumnPredicate.NullExpression(NullOperator.IS_NULL))
-    fun Field.isNull() = predicate(ColumnPredicate.NullExpression<Any>(NullOperator.IS_NULL))
+    fun Field.isNull() = predicate(ColumnPredicate.NullExpression(NullOperator.IS_NULL))
     fun <O, R> KProperty1<O, R?>.notNull() = predicate(ColumnPredicate.NullExpression(NullOperator.NOT_NULL))
-    fun Field.notNull() = predicate(ColumnPredicate.NullExpression<Any>(NullOperator.NOT_NULL))
+    fun Field.notNull() = predicate(ColumnPredicate.NullExpression(NullOperator.NOT_NULL))
 }
 
 inline fun <A> builder(block: Builder.() -> A) = block(Builder)

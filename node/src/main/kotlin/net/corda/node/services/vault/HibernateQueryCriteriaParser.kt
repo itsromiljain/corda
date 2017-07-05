@@ -83,7 +83,7 @@ class HibernateQueryCriteriaParser(val contractType: Class<out ContractState>,
         return predicateSet
     }
 
-    private fun columnPredicateToPredicate(column: Path<out Any?>, columnPredicate: ColumnPredicate<*>): Predicate {
+    private fun columnPredicateToPredicate(column: Path<out Any?>, columnPredicate: ColumnPredicate): Predicate {
         return when (columnPredicate) {
             is ColumnPredicate.EqualityComparison -> {
                 val literal = columnPredicate.rightLiteral
@@ -133,7 +133,7 @@ class HibernateQueryCriteriaParser(val contractType: Class<out ContractState>,
     /**
      * @return : Expression<Boolean> -> : Predicate
      */
-    private fun <O, R> expressionToExpression(root: Root<O>, expression: CriteriaExpression<O, R>): Expression<R> {
+    private fun <O, R> expressionToExpression(root: Root<O>, expression: CriteriaExpression): Expression<R> {
         return when (expression) {
             is CriteriaExpression.BinaryLogical -> {
                 val leftPredicate = expressionToExpression(root, expression.left)
@@ -144,14 +144,14 @@ class HibernateQueryCriteriaParser(val contractType: Class<out ContractState>,
                 }
             }
             is CriteriaExpression.Not -> criteriaBuilder.not(expressionToExpression(root, expression.expression)) as Expression<R>
-            is CriteriaExpression.ColumnPredicateExpression<O, *> -> {
+            is CriteriaExpression.ColumnPredicateExpression -> {
                 val column = root.get<Any?>(getColumnName(expression.column))
                 columnPredicateToPredicate(column, expression.predicate) as Expression<R>
             }
         }
     }
 
-    private fun <O> expressionToPredicate(root: Root<O>, expression: CriteriaExpression<O, Boolean>): Predicate {
+    private fun <O> expressionToPredicate(root: Root<O>, expression: CriteriaExpression): Predicate {
         return expressionToExpression(root, expression) as Predicate
     }
 
